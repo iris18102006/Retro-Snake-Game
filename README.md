@@ -7,7 +7,8 @@
 # Project Structure
 
 snake-84/
-└── snake.html          # That's it. Everything is in here.\
+
+└── snake.html          # That's it. Everything is in here.
 
 # Scoring
 
