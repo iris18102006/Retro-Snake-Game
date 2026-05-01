@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Retro Computer Snake</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  body {
+    background: #c0c0c0;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: 'Courier New', Courier, monospace;
+    overflow: hidden;
+  }
+  
+  /* Halftone dot pattern overlay for that dithered look */
+  .halftone {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 100;
+    opacity: 0.08;
+    background-image: radial-gradient(circle, #000 1.5px, transparent 1.5px);
+    background-size: 4px 4px;
+  }
+  
+  .desk {
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    gap: 30px;
+    padding-bottom: 80px;
+  }
+  
+  /* === MONITOR === */
+  .monitor {
+    width: 720px;
+    height: 580px;
+    position: relative;
+  }
+  
+  .monitor-case {
+    width: 100%;
+    height: 460px;
+    background: #d0d0d0;
+    border-radius: 12px;
+    padding: 35px;
+    box-shadow:
+      inset -8px -8px 16px rgba(0,0,0,0.15),
+      inset 8px 8px 16px rgba(255,255,255,0.6),
+      20px 20px 40px rgba(0,0,0,0.25),
+      -5px -5px 10px rgba(255,255,255,0.3);
+    position: relative;
+  }
+  
+  /* Dithered shading on monitor */
+  .monitor-case::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 12px;
+    background: 
+      linear-gradient(135deg, transparent 40%, rgba(0,0,0,0.04) 40%, rgba(0,0,0,0.04) 60%, transparent 60%),
+      linear-gradient(45deg, transparent 40%, rgba(0,0,0,0.03) 40%, rgba(0,0,0,0.03) 60%, transparent 60%);
+    background-size: 6px 6px;
+    pointer-events: none;
+  }
+  
+  .screen-container {
+    width: 100%;
+    height: 100%;
+    background: #0a0a0a;
+    border-radius: 24px;
+    padding: 18px;
+    box-shadow: inset 0 0 30px rgba(0,0,0,0.9);
+    border: 4px solid #2a2a2a;
+    position: relative;
+  }
+  
+  .crt-screen {
+    width: 100%;
+    height: 100%;
+    background: #000;
+    border-radius: 50% / 8%;
+    position: relative;
+    overflow: hidden;
+    box-shadow: inset 0 0 60px rgba(0,0,0,0.8);
+  }
+  
+  canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
+  
+  .scanlines {
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(0,0,0,0.25) 0px,
+      rgba(0,0,0,0.25) 2px,
+      transparent 2px,
+      transparent 4px
+    );
+    pointer-events: none;
+    z-index: 5;
+    border-radius: 50% / 8%;
+  }
+  
+  .crt-glow {
+    position: absolute;
+    inset: 0;
+    box-shadow: inset 0 0 80px rgba(0,0,0,0.6);
+    pointer-events: none;
+    z-index: 6;
+    border-radius: 50% / 8%;
+  }
+  
+  .monitor-stand {
+    width: 140px;
+    height: 50px;
+    background: #b0b0b0;
+    margin: 0 auto;
+    border-radius: 0 0 8px 8px;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+    position: relative;
+  }
+  
+  .monitor-stand::after {
+    content: '';
+    position: absolute;
+    bottom: -15px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 200px;
+    height: 15px;
+    background: #a0a0a0;
+    border-radius: 50%;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+  }
+  
+  .monitor-label {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 11px;
+    color: #666;
+    letter-spacing: 4px;
+    font-weight: bold;
+    text-shadow: 1px 1px 0 rgba(255,255,255,0.5);
+  }
+  
+  .power-light {
+    position: absolute;
+    bottom: 12px;
+    right: 50px;
+    width: 10px;
+    height: 10px;
+    background: #00ff00;
+    border-radius: 50%;
+    box-shadow: 0 0 8px #00ff00, inset -1px -1px 2px rgba(0,0,0,0.3);
+    animation: pulse 3s ease-in-out infinite;
+  }
+  
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  
+  /* === TOWER === */
+  .tower {
+    width: 160px;
+    height: 520px;
+    background: #c8c8c8;
+    border-radius: 6px;
+    position: relative;
+    box-shadow:
+      inset -5px -5px 10px rgba(0,0,0,0.1),
+      inset 5px 5px 10px rgba(255,255,255,0.5),
+      10px 10px 30px rgba(0,0,0,0.2);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 25px 0;
+    gap: 20px;
+  }
+  
+  .tower::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 6px;
+    background: radial-gradient(circle at 30% 30%, rgba(0,0,0,0.06) 1px, transparent 1px);
+    background-size: 4px 4px;
+    pointer-events: none;
+  }
+  
+  .tower-bay {
+    width: 110px;
+    height: 35px;
+    background: #1a1a1a;
+    border-radius: 4px;
+    box-shadow: inset 0 3px 6px rgba(0,0,0,0.6);
+    position: relative;
+  }
+  
+  .tower-bay::after {
+    content: '';
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 8px;
+    height: 8px;
+    background: #00ff00;
+    border-radius: 50%;
+    box-shadow: 0 0 6px #00ff00;
+  }
+  
+  .tower-slot {
+    width: 110px;
+    height: 8px;
+    background: #222;
+    border-radius: 2px;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.5);
+  }
+  
+  .floppy-drive {
+    width: 110px;
+    height: 30px;
+    background: #2a2a2a;
+    border-radius: 3px;
+    position: relative;
+    box-shadow: inset 0 2px 5px rgba(0,0,0,0.5);
+  }
+  
+  .floppy-drive::before {
+    content: '';
+    position: absolute;
+    left: 12px;
+    top: 7px;
+    width: 70px;
+    height: 16px;
+    background: #111;
+    border-radius: 1px;
+  }
+  
+  .floppy-drive::after {
+    content: '';
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 4px;
+    background: #ff0000;
+    border-radius: 50%;
+    box-shadow: 0 0 4px #ff0000;
+  }
+  
+  .tower-power {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: #b0b0b0;
+    margin-top: auto;
+    margin-bottom: 20px;
+    box-shadow:
+      inset -3px -3px 6px rgba(0,0,0,0.15),
+      inset 3px 3px 6px rgba(255,255,255,0.6),
+      0 4px 8px rgba(0,0,0,0.2);
+    position: relative;
+    cursor: pointer;
+    transition: transform 0.1s;
+  }
+  
+  .tower-power:active { transform: scale(0.95); }
+  
+  .tower-power::after {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 20px;
+    height: 20px;
+    border: 3px solid #555;
+    border-top-color: transparent;
+    border-radius: 50%;
+  }
+  
+  /* === KEYBOARD === */
+  .keyboard-wrap {
+    position: absolute;
+    bottom: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    perspective: 800px;
+  }
+  
+  .keyboard {
+    width: 560px;
+    height: 180px;
+    background: #bbb;
+    transform: rotateX(35deg);
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 
+      0 15px 30px rgba(0,0,0,0.25),
+      inset 0 -3px 8px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .kb-row {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+  }
+  
+  .kb-key {
+    width: 32px;
+    height: 32px;
+    background: #ccc;
+    border-radius: 4px;
+    box-shadow: 
+      0 3px 0 #999,
+      0 4px 4px rgba(0,0,0,0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: #444;
+    font-weight: bold;
+    transition: all 0.05s;
+  }
+  
+  .kb-key.pressed {
+    transform: translateY(3px);
+    box-shadow: 0 0 0 #999;
+    background: #aaa;
+  }
+  
+  .kb-key.wide { width: 50px; }
+  .kb-key.space { width: 200px; }
+  .kb-key.arrow { background: #b0b0b0; }
+  
+  /* === INSTRUCTIONS === */
+  .instructions {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #555;
+    font-size: 12px;
+    letter-spacing: 1px;
+    text-align: center;
+    z-index: 50;
+  }
+  
+  kbd {
+    background: #333;
+    color: #0f0;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-family: monospace;
+    border: 1px solid #555;
+  }
+</style>
+</head>
+<body>
+
+<div class="halftone"></div>
+
+<div class="desk">
+  <div class="monitor">
+    <div class="monitor-case">
+      <div class="screen-container">
+        <div class="crt-screen">
+          <canvas id="game" width="320" height="240"></canvas>
+          <div class="scanlines"></div>
+          <div class="crt-glow"></div>
+        </div>
+      </div>
+      <div class="monitor-label">SNAKE-84</div>
+      <div class="power-light"></div>
+    </div>
+    <div class="monitor-stand"></div>
+    
+    <div class="keyboard-wrap">
+      <div class="keyboard">
+        <div class="kb-row">
+          <div class="kb-key">1</div><div class="kb-key">2</div><div class="kb-key">3</div><div class="kb-key">4</div><div class="kb-key">5</div><div class="kb-key">6</div><div class="kb-key">7</div><div class="kb-key">8</div><div class="kb-key">9</div><div class="kb-key">0</div><div class="kb-key wide">←</div>
+        </div>
+        <div class="kb-row">
+          <div class="kb-key">Q</div><div class="kb-key">W</div><div class="kb-key">E</div><div class="kb-key">R</div><div class="kb-key">T</div><div class="kb-key">Y</div><div class="kb-key">U</div><div class="kb-key">I</div><div class="kb-key">O</div><div class="kb-key">P</div><div class="kb-key wide">RET</div>
+        </div>
+        <div class="kb-row">
+          <div class="kb-key">A</div><div class="kb-key">S</div><div class="kb-key">D</div><div class="kb-key">F</div><div class="kb-key">G</div><div class="kb-key">H</div><div class="kb-key">J</div><div class="kb-key">K</div><div class="kb-key">L</div><div class="kb-key">;</div><div class="kb-key wide">↵</div>
+        </div>
+        <div class="kb-row">
+          <div class="kb-key">Z</div><div class="kb-key">X</div><div class="kb-key">C</div><div class="kb-key">V</div><div class="kb-key">B</div><div class="kb-key">N</div><div class="kb-key">M</div><div class="kb-key">,</div><div class="kb-key">.</div><div class="kb-key">/</div><div class="kb-key arrow" id="key-up">↑</div>
+        </div>
+        <div class="kb-row">
+          <div class="kb-key space"></div>
+          <div class="kb-key arrow" id="key-left">←</div><div class="kb-key arrow" id="key-down">↓</div><div class="kb-key arrow" id="key-right">→</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="tower">
+    <div class="tower-bay"></div>
+    <div class="tower-bay"></div>
+    <div class="floppy-drive"></div>
+    <div class="floppy-drive"></div>
+    <div class="tower-slot"></div>
+    <div class="tower-slot"></div>
+    <div class="tower-slot"></div>
+    <div class="tower-power" onclick="resetGame()" title="Reset"></div>
+  </div>
+</div>
+
+<div class="instructions">
+  Use <kbd>ARROWS</kbd> to move &nbsp;•&nbsp; <kbd>R</kbd> to restart &nbsp;•&nbsp; Click tower power to reset
+</div>
+
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+
+const COLS = 32;
+const ROWS = 24;
+const CELL = 10;
+
+let snake, dir, nextDir, food, score, gameOver, speed, lastTime, particles;
+
+function init() {
+  snake = [{x: 5, y: 12}, {x: 4, y: 12}, {x: 3, y: 12}];
+  dir = {x: 1, y: 0};
+  nextDir = {x: 1, y: 0};
+  food = spawnFood();
+  score = 0;
+  gameOver = false;
+  speed = 140;
+  lastTime = 0;
+  particles = [];
+}
+init();
+
+function spawnFood() {
+  let pos;
+  do {
+    pos = {x: Math.floor(Math.random() * COLS), y: Math.floor(Math.random() * ROWS)};
+  } while (snake.some(s => s.x === pos.x && s.y === pos.y));
+  return pos;
+}
+
+const keyEl = {
+  'ArrowUp': document.getElementById('key-up'),
+  'ArrowDown': document.getElementById('key-down'),
+  'ArrowLeft': document.getElementById('key-left'),
+  'ArrowRight': document.getElementById('key-right')
+};
+
+document.addEventListener('keydown', (e) => {
+  const map = {
+    'ArrowUp': {x: 0, y: -1},
+    'ArrowDown': {x: 0, y: 1},
+    'ArrowLeft': {x: -1, y: 0},
+    'ArrowRight': {x: 1, y: 0}
+  };
+  
+  if (map[e.key]) {
+    e.preventDefault();
+    const nd = map[e.key];
+    if (nd.x !== -dir.x || nd.y !== -dir.y) {
+      nextDir = nd;
+    }
+    if (keyEl[e.key]) {
+      keyEl[e.key].classList.add('pressed');
+      setTimeout(() => keyEl[e.key].classList.remove('pressed'), 120);
+    }
+  }
+  
+  if ((e.key === 'r' || e.key === 'R') && gameOver) {
+    resetGame();
+  }
+});
+
+function resetGame() {
+  init();
+}
+
+function spawnParticles(x, y, color) {
+  for (let i = 0; i < 6; i++) {
+    particles.push({
+      x: x * CELL + CELL/2,
+      y: y * CELL + CELL/2,
+      vx: (Math.random() - 0.5) * 3,
+      vy: (Math.random() - 0.5) * 3,
+      life: 1.0,
+      color: color
+    });
+  }
+}
+
+function update() {
+  if (gameOver) return;
+  
+  dir = nextDir;
+  const head = {x: snake[0].x + dir.x, y: snake[0].y + dir.y};
+  
+  if (head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS || snake.some(s => s.x === head.x && s.y === head.y)) {
+    gameOver = true;
+    return;
+  }
+  
+  snake.unshift(head);
+  
+  if (head.x === food.x && head.y === food.y) {
+    score += 10;
+    speed = Math.max(55, speed - 2);
+    spawnParticles(food.x, food.y, '#ff3333');
+    food = spawnFood();
+  } else {
+    snake.pop();
+  }
+}
+
+function draw() {
+  // Phosphor persistence (trail effect)
+  ctx.fillStyle = 'rgba(0, 8, 0, 0.25)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  // Subtle grid
+  ctx.fillStyle = 'rgba(51, 255, 51, 0.04)';
+  for (let x = 0; x < COLS; x++) {
+    for (let y = 0; y < ROWS; y++) {
+      ctx.fillRect(x * CELL + 4, y * CELL + 4, 2, 2);
+    }
+  }
+  
+  // Food with glow
+  ctx.fillStyle = '#ff3333';
+  ctx.shadowColor = '#ff0000';
+  ctx.shadowBlur = 12;
+  ctx.fillRect(food.x * CELL + 1, food.y * CELL + 1, CELL - 2, CELL - 2);
+  ctx.shadowBlur = 0;
+  
+  // Snake
+  snake.forEach((seg, i) => {
+    const isHead = i === 0;
+    ctx.fillStyle = isHead ? '#55ff55' : '#33ff33';
+    ctx.shadowColor = '#33ff33';
+    ctx.shadowBlur = isHead ? 10 : 5;
+    
+    const pad = isHead ? 1 : 2;
+    ctx.fillRect(seg.x * CELL + pad, seg.y * CELL + pad, CELL - pad*2, CELL - pad*2);
+    
+    if (isHead) {
+      ctx.fillStyle = '#000';
+      ctx.shadowBlur = 0;
+      ctx.fillRect(seg.x * CELL + 2, seg.y * CELL + 2, 2, 2);
+      ctx.fillRect(seg.x * CELL + 6, seg.y * CELL + 2, 2, 2);
+    }
+  });
+  ctx.shadowBlur = 0;
+  
+  // Particles
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life -= 0.05;
+    if (p.life <= 0) {
+      particles.splice(i, 1);
+      continue;
+    }
+    ctx.fillStyle = p.color;
+    ctx.globalAlpha = p.life;
+    ctx.fillRect(p.x, p.y, 2, 2);
+  }
+  ctx.globalAlpha = 1;
+  
+  // HUD
+  ctx.fillStyle = '#33ff33';
+  ctx.shadowColor = '#33ff33';
+  ctx.shadowBlur = 4;
+  ctx.font = '10px "Courier New", monospace';
+  ctx.fillText(`SCORE ${score.toString().padStart(4, '0')}`, 6, 14);
+  ctx.fillText(`SPD ${Math.floor((140 - speed) / 2).toString().padStart(2, '0')}`, 100, 14);
+  ctx.shadowBlur = 0;
+  
+  // Game Over
+  if (gameOver) {
+    ctx.fillStyle = 'rgba(0, 10, 0, 0.85)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    ctx.fillStyle = '#ff3333';
+    ctx.shadowColor = '#ff0000';
+    ctx.shadowBlur = 15;
+    ctx.font = 'bold 20px "Courier New", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 15);
+    
+    ctx.fillStyle = '#33ff33';
+    ctx.shadowColor = '#33ff33';
+    ctx.shadowBlur = 8;
+    ctx.font = '12px "Courier New", monospace';
+    ctx.fillText(`FINAL SCORE ${score}`, canvas.width / 2, canvas.height / 2 + 10);
+    ctx.fillText('PRESS R', canvas.width / 2, canvas.height / 2 + 28);
+    ctx.textAlign = 'left';
+    ctx.shadowBlur = 0;
+  }
+}
+
+function loop(timestamp) {
+  if (timestamp - lastTime > speed) {
+    update();
+    lastTime = timestamp;
+  }
+  draw();
+  requestAnimationFrame(loop);
+}
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
